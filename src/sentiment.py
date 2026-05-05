@@ -1,8 +1,13 @@
+"""
+Assignment 2: neural netowrk classifier with word embeddings
+"""
+
 import os
 
 import pandas as pd
 import torch
 import torch.nn as nn
+
 from rnn import RNNEncoder
 
 

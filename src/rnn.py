@@ -1,3 +1,7 @@
+"""
+Assignment 3: RNN
+"""
+
 import torch
 from torch import nn
 

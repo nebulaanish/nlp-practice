@@ -1,3 +1,8 @@
+"""
+Assignment 1: Problem: Bag of Words model
+
+"""
+
 import torch
 import torch.nn.functional as F
 
