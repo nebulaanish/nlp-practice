@@ -1,9 +1,19 @@
-
-
 """
 Problems with RNN:
 - Early words may lose influence over long sequences. GRU mitigates this partially.
 - Sequential processing, can't be parallelized.
+
+
+Both stem from same fundamental issue. Each hidden reperesentation is a function of previous one.
+
+- What if we compute how relevant each word is from every other word in a sequence?
+- Relevance or similarity in attention is computed using dot product.
+    - Cosine similarity is not used, at it normalizes.
+    - Only preserves direction, not magnitude. So, how similar? is not preserved.
+    - dot product is much faster as well.
+
+Q: But, is this enough? Learning just the similarity?
+A: No, we also need to learn how much to attend each word.
 
 Other concerns:
 - Words change their meaning based on their context.
@@ -25,7 +35,7 @@ Take a sentence: "The cat didn't cross the street because it was too tired."
 - For "it" to represent it's true meaning, it needs to be aware of other words in the context.
 
 Step 1: For being able to represent it's own true meaning:
-    - Query: "it" asks a question => Whatpronound, represnting a singular noun is capable of being tired?
+    - Query: "it" asks a question => What pronouns, representing a singular noun is capable of being tired?
     - Key:
         "street": has some value, but key is an easily searchable repr. Say, it says "I'm a singular noun, but not cabaple of being tired"
         "cat": Say, it says "I'm a singular noun, and cabaple of being tired"
@@ -83,20 +93,75 @@ Step4: Weighted sum of values:
     - Output = attention_weights * V
 
 
-This makes the final equation as: 
+This makes the final equation as:
     Attention(Q, K, V) = softmax((Q * K^T) / sqrt(d_k)) * V
 
 
+----
+Example sentence: "The trophy didn't fit in the suitcase because it was too big."
 
-Both stem from same fundamental issue. Each hidden reperesentation is a function of previous one.
+Questions:
+Q: Why do we need Q,K,V? Why not just use embeddings directly?
+A:
+    Problem 1: say every word is represented as embedding. (e_i for query and e_j for key).
+        - similarity would be e_i . e_j
+        - Dot product is symmetric, so, e_i . e_j = e_j . e_i
+        - But, this is wrong. "it" in above context is similar to "trophy", but "trophy" is not similar to "it". "trophy" doesn't need to attend  to "it".
 
-- What if we compute how relevant each word is from every other word in a sequence?
-- Relevance or similarity in attention is computed using dot product.
-    - Cosine similarity is not used, at it normalizes.
-    - Only preserves direction, not magnitude. So, how similar? is not preserved.
-    - dot product is much faster as well.
+    Problem 2: Self Attention degenerates.
+        - e_i . e_i = || e_i || ^2, which is usually a large positive number.
+        - So, every word will attend to itself most strongly.
+        - Everything else will be negligible in comparison.
 
-Q: But, is this enough? Learning just the similarity?
-A: No, we also need to learn how much to attend each word.
+    Problem 3: Each word plays a different role depending on who is looking at it.
+        - Eg: When "it" is looking at "trophy", it needs to know that "trophy" is a singular noun, and can be big.
+        - But when "big" is looking at "trophy", it needs to know that "trophy" is a noun that has some size.
+        - A single vector (embedding), can't do this.
+
+Following up to above question, why not use Key only then? Why do we need Value?
+
+
+Q: Why do we need a different K and V? Why not just use K for both? 
+A: - The key is concise repr that makes you findable. 
+   - Value on the other hand is actual information to be extracted. 
+   - Trying to read entire value to find the relevance would be computationally expensive.
+   - Keys needs to be shaped to match queries well. 
+   - Values needs to be shaped to be useful info for downstream layers.
+ 
+---
+# Cross Attention: 
+Let's take a translation problem. 
+English -> French
+ "The cat didn't cross the street because it was too tired."
+
+    - Let's say we're at postition 5, in french sentence.  Next words are not known. 
+        ("Le chat n'a pas ..")
+    - At this stage, the English has it's own self attention, French has it's own self attention. 
+    - But, for next word in French, we need to look at English sentence as well. 
+    - Here, the Q comes from French sentence and K,V comes from English sentence. 
+    - French is decoder(Who needs information) side, English(Who has the information) is encoder side.
+
+
+### Masking: 
+    - In above case, decoder's future words are not know. In that case, the attention of words beyond (postion 5) are masked. 
+    - But WHy? 
+    - Reason 1: During training, if future words are not masked, model can cheat. 
+    - Reason 2: Masking enables us to train effiiciently in parallel. 
+        - Without masking, like RNN, we would say here are 4 words generated, predict 5. 
+        - With maksing, we can send entire sentence, and mask ensures each postition can only see it's past. 
+        - This way we can get N predictions in parallel with the cost of one forward pass.
+
+
+# Multi-Head Attention:
+- Every word requires to form a Q, so that it can know how to attend to other words. 
+- But, a single Q may not be sufficient to capture all different aspects of relevance. 
+- So, with multi-head attention, we have multiple sets of W_Q, W_K, W_V.
+- Each set of W_Q, W_K, W_V is called a head.
+- Each head learns to attend to different aspects of the sentence.
+- For example, in the sentence "The cat didn't cross the street because it was too tired"
+    - Take for "it", Questions it may ask are:  Who am I? What state am I in? What action am I involved in? There are 3 different aspects of relevance.
+    - With multi-head attention, we can have 3 different heads, each learning to attend to different aspects of the sentence. 
+    - One head may learn to attend to "cat", another head may learn to attend to "tired", and another head may learn to attend to "cross". 
+
 
 """
